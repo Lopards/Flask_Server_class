@@ -18,16 +18,18 @@ class ChatApp:
 
         self.rooms = {}
         self.users_in_rooms = {}
-        self.room_s = {}
+
         self.connected_users= {}
         self.setup_routes()
-
+        self.setup_socketio()
 
     def setup_routes(self):
         @self.app.route("/")
         def index():
             return render_template("index.html")
         
+        
+    def setup_socketio(self):  
         @self.socketio.on("baglan")
         def baglan(data):
             print("veri:",data)
@@ -45,15 +47,11 @@ class ChatApp:
             
             join_room(room)
             
-            # Bağlı kullanıcıların bilgilerini sakla
-            
-
-
             send({"name": name, "message": "has entered the room"})
             self.rooms[room]["members"].append(name)
             self.users_in_rooms[room].append(name)
             print("self.users.in.room [room]pritn etmek ben",self.users_in_rooms[room])
-            self.connected_users[request.sid] = {"name": name, "room": room}
+            self.connected_users[request.sid] = {"name": name, "room": room} # Bağlı kullanıcıların bilgilerini sakla
             print(f"{name} joined room {room}")
 
 
@@ -63,11 +61,11 @@ class ChatApp:
             
 
 
-        @self.socketio.on("disconnect")
+        @self.socketio.on("disconnect") # odadan çıkan üyeleri odadan siler, eğer odadaki üye sayısı 0 ise odayı del yapar.
         def disconnect():
             print("Kullanıcı odadan çıkıverdi: {}".format(request.sid))
             user_data = self.connected_users.get(request.sid)
-            print("disccenet tarafı",user_data.get("name"))
+            
             # request.sid'ye bağlı olan kullanıcının bilgilerini al
             if user_data:
                 name = user_data.get("name")
@@ -96,6 +94,7 @@ class ChatApp:
 
             if code not in self.rooms:
                 self.rooms[code] = {"members": [name], "messages": []}
+                
                 self.users_in_rooms[code] = [name]
                 print(self.users_in_rooms[code],"odaya eklendi CREATE ROOM")
                 print(f"Oda oluşturuldu. Adı: {name}, Kodu: {code}")
@@ -128,26 +127,31 @@ class ChatApp:
             )
          
 
-        @self.socketio.on("audio_data")
+        @self.socketio.on("audio_data") # doktor tarafından fgelen ses verisini odadaki üyelere yönlendirir.
         def audio_data(data1):
-            emit("data1", data1, to=self.room_s, broadcast=True)
-            # (Kodunuzun geri kalanı burada)
+            user_data = self.connected_users.get(request.sid)
+            room = user_data.get("room")
+            emit("data1", data1, to=room, broadcast=True)
+     
 
-        @self.socketio.on("audio_data2")
+        @self.socketio.on("audio_data2") # Öğrenci tarafından fgelen ses verisini odadaki üyelere yönlendirir.
         def audio_data2(data2):
-            emit("data2", data2, to=self.room_s, broadcast=True)
+            user_data = self.connected_users.get(request.sid)
+            room = user_data.get("room")
+            emit("data2", data2, to=room, broadcast=True)
             #
 
         @self.socketio.on("output_device_list")
-        def output_device_list(List):
-            print("odadaki kullanıcılar:",self.users_in_rooms)
-            print("odalar:",self.rooms)
-            print(self.room_s,"room_s")
-            emit("liste", List, to=self.room_s)
+        def output_device_list(List):   
+            user_data = self.connected_users.get(request.sid)
+            room = user_data.get("room")
+            emit("liste", List, to=room)
 
         @self.socketio.on("output_device_index")
         def output_device_list(index):
-            emit("index", index, to=self.room_s)
+            user_data = self.connected_users.get(request.sid)
+            room = user_data.get("room")
+            emit("index", index, to=room)
             #
 
         @self.socketio.on("message")
@@ -176,8 +180,9 @@ class ChatApp:
         @self.socketio.on("see_members_on_room")
         def see_members_on_room(data):
                 room = session.get("room") or data["room"]
-                #name = session.get("name") or data["name"]
+
                 print(self.rooms[room]["members"],"odadaki üyerler")
+                print(room)
 
 
         if __name__ == "__main__":
