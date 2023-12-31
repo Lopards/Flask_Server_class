@@ -1,4 +1,3 @@
-
 #sesli iletişim uygulamasının arayüzsüz hali için yapıldı.
 #Rise Together
 
@@ -12,7 +11,7 @@ import socketio
 from cryptography.fernet import Fernet
 import base64
 import os
-
+import time
 sio = socketio.Client()
 
 
@@ -33,7 +32,7 @@ class istemci_page():
         self.kullanici_ad = input("kullanici adini giriniz:\n")
         self.oda_kodu_ID()
 
-        self.start_communication()
+        #self.start_communication()
     def oda_kodu_ID(self):
 
         """
@@ -82,7 +81,7 @@ class istemci_page():
         sio.on("data1", self.get_sound)
 
         sio.connect("http://192.168.1.45:5000", auth={"name": name, "room": room})
-        #sio.wait()
+        sio.wait()
 
 
 
@@ -92,8 +91,7 @@ class istemci_page():
             "message"
         )  # flask projesindeki message olayına 'on' ile bağlanıyoruz. bu şekilde mesaj gönderildiğinde handle_message aktif olacak
         def handle_message(message):
-            print(message)
-            print("s")
+            
             if "message" in message:
                 text = message.get("message", "")  # Şifreli mesaj içeriğini al
                 efekt = message.get("efekt", "")  # Efekti al
@@ -103,7 +101,7 @@ class istemci_page():
                     pass
                 else:
                     # Mesajı çöz
-                    print(key)
+                    
                     key = base64.urlsafe_b64decode(key.decode("utf-8"))  # Anahtarı çöz
                     decrypted_message = self.decrypt_message(text, key)
 
@@ -138,11 +136,15 @@ class istemci_page():
         return decrypted_message
     
     def get_sound(self, data):
-        
-        p = pyaudio.PyAudio()
-        try:
-            if self.output_stream is None:
-                self.output_stream = p.open(
+        if not self.Event.is_set() and self.stream is None:
+
+            
+            try:
+                self.Event.set()
+                print("set yapıldı.")
+                time.sleep(0.1)
+                p = pyaudio.PyAudio()
+                self.stream = p.open(
                     output=True,
                     format=pyaudio.paInt16,
                     channels=self.CHANNELS,
@@ -150,25 +152,29 @@ class istemci_page():
                     frames_per_buffer=self.CHUNK,
 
                 )
-                print("1111")
+            except OSError as e:
+                print("Hoparlör bağlantısı yapılamadı:", e)
+                self.stream = None
+                ##### ********** ######
+            
 
-            try:
 
-                if data:
-                    audio_data = data.get("audio_data", b"")
-                    #print(audio_data)
-                    # print(audio_data)
-                    #if self.is_running_recv:
-                        # self.play_button_clicked()
-                        # self.play_server_output(audio_data)
-                    self.output_stream.write(audio_data)
-                elif not data:
-                    print("data yok")
 
-            except Exception as e:
-                print("Ses alma hatası:", e)
-        except:
-                print("ses alım kapandı")
+
+        try:
+
+            if data:
+                audio_data = data.get("audio_data", b"")
+                # print(audio_data)
+                #if self.is_running_recv:
+                    # self.play_button_clicked()
+                #↓self.play_server_output(audio_data)
+                self.stream.write(audio_data)
+            elif not data:
+                print("dadta yok")
+
+        except Exception as e:
+            print("Ses alma hatası:", str(e))
 
 
     def send_audio(self):
@@ -201,6 +207,48 @@ class istemci_page():
     def start_communication(self):
         threading.Thread(target=self.send_audio).start()
 
+    def play_button_clicked(self):
+
+        # ☺while True:
+        try:
+             
+             self.set_output_stream()
+
+                # self.stop_event.clear()
+        except Exception as e:
+            print("hoparlör seçiminde hata:", e)
+        # self.play_server_output(data)
+
+    def set_output_stream(self):
+        p = pyaudio.PyAudio()
+        try:
+            self.output_stream = p.open(
+                output=True,
+                format=pyaudio.paInt16,
+                channels=self.CHANNELS,
+                rate=self.RATE,
+                frames_per_buffer=self.CHUNK,
+
+            )
+        except OSError as e:
+            print("Hoparlör bağlantısı yapılamadı:", e)
+            self.output_stream = None
+            ##### ********** ######
+
+    def play_server_output(self, data):
+        
+        if self.output_stream is not None:
+            try:
+                self.output_stream.write(data)
+                print(data)
+            except OSError as e:
+                print("Hoparlör bağlantısı koparıldı:", e)
+                self.output_stream.close()
+                self.output_stream.stop_stream()
+                self.output_stream = None
+
+        else:
+            print("Hoparlör seçiniz...")
 
 if __name__ == "__main__":
         app = istemci_page()
