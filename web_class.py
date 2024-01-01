@@ -45,6 +45,7 @@ class ChatApp:
                 leave_room(room)
                 return
             
+            
             join_room(room)
             
             send({"name": name, "message": "has entered the room"})
@@ -76,6 +77,7 @@ class ChatApp:
                     self.rooms[room]["members"].remove(name)
                     self.users_in_rooms[room].remove(name)
                     print(len(self.users_in_rooms[room]))
+                    print(self.rooms[room])
                     if room in self.rooms and len(self.rooms[room]["members"]) <= 0:
                         
                         del self.rooms[room]
@@ -178,13 +180,26 @@ class ChatApp:
             print(f"{name} said: {message}")
 
         @self.socketio.on("see_members_on_room")
-        def see_members_on_room(data):
-                room = session.get("room") or data["room"]
+        def see_members_on_room():
+                #room = session.get("room") or data["room"]
+                
+                user_data = self.connected_users.get(request.sid)
+                room = user_data.get("room")
+                members = self.rooms[room]["members"]
+                emit("members",members,to=room)
+        
+        @self.socketio.on("remove_member")
+        def remove_member(member_info):
+            try:
+                user_data = self.connected_users.get(request.sid)
+                room = user_data.get("room")
 
-                print(self.rooms[room]["members"],"odadaki üyerler")
-                print(room)
+                self.users_in_rooms[room].remove(member_info)
 
+            except Exception as e:
+                print("hata,", e)
 
+    
         if __name__ == "__main__":
             self.socketio.run(self.app, host="192.168.1.45", debug=True)
 
