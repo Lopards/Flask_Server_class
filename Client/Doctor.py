@@ -15,7 +15,7 @@ from string import ascii_uppercase
 from scipy import signal
 import os
 from cryptography.fernet import Fernet
-
+import keyboard
 sio = socketio.Client()
 
 class server_erkek_page:
@@ -23,7 +23,7 @@ class server_erkek_page:
         super().__init__()
         #ses iletiminde sesin özellikleri:
         self.FORMAT = pyaudio.paInt16
-        self.CHUNK = 1024
+        self.CHUNK = 512
         self.CHANNELS = 1
         self.RATE = 44100
         self.PITCH_SHIFT_FACTOR = 1.2  
@@ -34,28 +34,34 @@ class server_erkek_page:
         self.Event = threading.Event()
 
         #######***************########
-        self.create_connection()                                
         self.enter_room()
+        self.create_connection()                                
+        
         self.start_communication() #ses göndermeyi başlat
+        self.yazi_gonder_t()
     def create_connection(self):
         """
         MySQL veritabanına bağlantı oluşturur.
         """
-        kullanici_ad = "1"
-        
-        connection = mysql.connector.connect(
-            host="rise.czfoe4l74xhi.eu-central-1.rds.amazonaws.com",
-            user="admin",
-            password="Osmaniye12!",
-            database="rise_data",
-        )
-        cursor = connection.cursor()
-        cursor.execute(
-            "UPDATE veriler SET oda_kodu =%s WHERE kullanici_ad = %s ",
-            (self.room_code, kullanici_ad),
-        )
-        connection.commit()
-        connection.close()
+        try:
+            kullanici_ad = "1"
+            
+            connection = mysql.connector.connect(
+                host="rise.czfoe4l74xhi.eu-central-1.rds.amazonaws.com",
+                user="admin",
+                password="Osmaniye12!",
+                database="rise_data",
+            )
+            cursor = connection.cursor()
+            cursor.execute(
+                "UPDATE veriler SET oda_kodu =%s WHERE kullanici_ad = %s ",
+                (self.room_code, kullanici_ad),
+            )
+            connection.commit()
+            connection.close()
+        except:
+            print("yanlış kullanici adi girdiniz. tekrar deneyiniz")
+            return
                                         #######***************########
         
     def room_name(self):  # flask için Oda kodu oluşturuyoruz
@@ -76,7 +82,7 @@ class server_erkek_page:
         room_code = self.room_name()
 
         print(room_code)
-        sio.on("liste", self.hoparlor_liste_al) #hoparlör listesi için dinle
+        #sio.on("liste", self.hoparlor_liste_al) #hoparlör listesi için dinle
 
         sio.on("data2", self.get_sound) #gelen sesleri dinle
         
@@ -114,7 +120,7 @@ class server_erkek_page:
 
         try:
             while True:
-                #while self.is_running:
+                while keyboard.is_pressed("m"):
                     data = stream.read(self.CHUNK, exception_on_overflow=False)
                     audio_data = np.frombuffer(data, dtype=np.int16)
 
@@ -160,6 +166,7 @@ class server_erkek_page:
                     output=True,
                     frames_per_buffer=1024,
                 )
+                
             if data:
                 audio_data = data.get("audio_data2", b"")
 
@@ -180,36 +187,37 @@ class server_erkek_page:
         room = self.room_code
 
         name = "Doktor"
+        while True:
+            try:
+                #message = self.server_erkek.metin_yeri.toPlainText()
 
-        try:
-            message = self.server_erkek.metin_yeri.toPlainText()
-            message = input("Göndereceğiniz Metin girin")
-            secili_efekt = (
-                self.server_erkek.efek_combobox.currentIndex()
-            )  # comboboxda ki efekti al
-            efekt = int(secili_efekt)
-            efekt = input("metni okunacak efekti seçin:  0: erkek, 1:kadın, 2:çocuk, 3:yaşlı kadın(babanne), 4:yaşlı adam(dede)")
+                message = input("Göndereceğiniz Metin girin")
+                """secili_efekt = (
+                    self.server_erkek.efek_combobox.currentIndex()
+                )  # comboboxda ki efekti al
+                efekt = int(secili_efekt)"""
+                efekt = input("metni okunacak efekti seçin:  0: erkek, 1:kadın, 2:çocuk, 3:yaşlı kadın(babanne), 4:yaşlı adam(dede)")
 
-            # Anahtar oluştur
-            key = self.generate_key()  # text için key oluştur
+                # Anahtar oluştur
+                key = self.generate_key()  # text için key oluştur
 
-            encrypted_message = self.encrypt_message(message, key)  # Mesajı şifrele
+                encrypted_message = self.encrypt_message(message, key)  # Mesajı şifrele
 
-            # flaskta ki message olayına şifreli mesajı- room-efekt ve keyi sözcük içinde emitle
-            sio.emit(
-                "message",
-                {
-                    "data": encrypted_message.decode(),
-                    "room": room,
-                    "name": name,
-                    "efekt": efekt,
-                    "key": key,
-                },
-            )
-        except KeyboardInterrupt:
-            pass
+                # flaskta ki message olayına şifreli mesajı- room-efekt ve keyi sözcük içinde emitle
+                sio.emit(
+                    "message",
+                    {
+                        "data": encrypted_message.decode(),
+                        "room": room,
+                        "name": name,
+                        "efekt": int(efekt),
+                        "key": key,
+                    },
+                )
+            except KeyboardInterrupt:
+                pass
 
-            # sio.wait()
+        #sio.wait()
 
             # sio.disconnect()
 
@@ -247,3 +255,4 @@ class server_erkek_page:
     
 if __name__ == "__main__":
     chat_app = server_erkek_page()
+    #chat_app.yazi_gonder_t()
