@@ -1,3 +1,4 @@
+#Serveri başlatmak için if "__name__" kısmındaki  host'a  kendi ip numaranızı giriniz.
 from flask import Flask, render_template, session, redirect, request
 from flask_socketio import SocketIO, emit, send, join_room, leave_room
 import base64
@@ -20,14 +21,9 @@ class ChatApp:
         self.users_in_rooms = {}
 
         self.connected_users= {}
-        self.setup_routes()
+        
         self.setup_socketio()
 
-    def setup_routes(self):
-        @self.app.route("/")
-        def index():
-            return render_template("index.html")
-        
         
     def setup_socketio(self):  
         @self.socketio.on("baglan")
@@ -51,7 +47,7 @@ class ChatApp:
             send({"name": name, "message": "has entered the room"})
             self.rooms[room]["members"].append(name)
             self.users_in_rooms[room].append(name)
-            print("self.users.in.room [room]pritn etmek ben",self.users_in_rooms[room])
+           
             self.connected_users[request.sid] = {"name": name, "room": room} # Bağlı kullanıcıların bilgilerini sakla
             print(f"{name} joined room {room}")
 
@@ -156,12 +152,15 @@ class ChatApp:
             emit("index", index, to=room)
             #
 
-        @self.socketio.on("message")
-        def message(data):
-            room = session.get("room") or data["room"]
-            name = session.get("name") or data["name"]
+        @self.socketio.on("message_doktor") #doktora gönderilen mesajlar için
+        def message_doktor(data):
+            """room = session.get("room") or data["room"]
+            name = session.get("name") or data["name"]"""
+            user_data = self.connected_users.get(request.sid)
+            room = user_data.get("room")
+            name = user_data.get("name")
             message = data["data"]
-            print("message metodu name ve room print:",name,room)
+            
             efekt = data.get("efekt")
             key = data.get("key")  # Anahtarı al
 
@@ -178,6 +177,36 @@ class ChatApp:
             send(content, to=room)
             self.rooms[room]["messages"].append(content)
             print(f"{name} said: {message}")
+        
+        @self.socketio.on("message_student")
+        def message_student(data):  #studente  gönderilen mesajlar için
+
+            user_data = self.connected_users.get(request.sid)
+            room = user_data.get("room")
+            name = user_data.get("name")
+            
+            message = data["data"]
+            
+            efekt = data.get("efekt")
+            key = data.get("key")  # Anahtarı al
+
+            if room not in self.rooms:
+                print("message!!! ROOM YOK")
+                emit("message_doktor","Oda yok")
+                return
+
+            content = {
+                "name": name,
+                "message": message,
+                "key": key,  # Anahtarı ekle
+            }
+            send(content, to=room)
+            emit("message_student",content,to=room)
+            self.rooms[room]["messages"].append(content)
+            print(f"{name} dedi: {message}")
+
+
+
 
         @self.socketio.on("see_members_on_room")
         def see_members_on_room():
@@ -201,7 +230,7 @@ class ChatApp:
 
     
         if __name__ == "__main__":
-            self.socketio.run(self.app, host="192.168.1.45", debug=True)
+            self.socketio.run(self.app, host="YOUR_IP_aDRESS", debug=True)
 
 
 if __name__ == "__main__":
