@@ -1,7 +1,12 @@
 #sesli iletişim uygulamasının arayüzsüz hali için yapıldı.
 #Rise Together
-
 #Emirhan Said ERDEM
+
+# İlk Olarak İP adresinizi create_room fonksiyonunda gerekli yere yazın
+# Kodu başlatın, İlk mesajı gönderdikten sonra biraz bekleyin. (2-3 saniye)
+# Ses göndermek için Oda kurulduktan sonra 'm' tuşuna basın
+
+
 
 
 import pyaudio
@@ -16,6 +21,9 @@ from scipy import signal
 import os
 from cryptography.fernet import Fernet
 import keyboard
+import time
+import base64
+
 sio = socketio.Client()
 
 class server_erkek_page:
@@ -23,7 +31,7 @@ class server_erkek_page:
         super().__init__()
         #ses iletiminde sesin özellikleri:
         self.FORMAT = pyaudio.paInt16
-        self.CHUNK = 512
+        self.CHUNK = 1024
         self.CHANNELS = 1
         self.RATE = 44100
         self.PITCH_SHIFT_FACTOR = 1.2  
@@ -32,36 +40,11 @@ class server_erkek_page:
 
         self.room_code = ""
         self.Event = threading.Event()
-
-        #######***************########
+        self.set_output_stream()
+        ######***************########
         self.enter_room()
-        self.create_connection()                                
-        
-        self.start_communication() #ses göndermeyi başlat
-        self.yazi_gonder_t()
-    def create_connection(self):
-        """
-        MySQL veritabanına bağlantı oluşturur.
-        """
-        try:
-            kullanici_ad = "1"
-            
-            connection = mysql.connector.connect(
-                host="rise.czfoe4l74xhi.eu-central-1.rds.amazonaws.com",
-                user="admin",
-                password="Osmaniye12!",
-                database="rise_data",
-            )
-            cursor = connection.cursor()
-            cursor.execute(
-                "UPDATE veriler SET oda_kodu =%s WHERE kullanici_ad = %s ",
-                (self.room_code, kullanici_ad),
-            )
-            connection.commit()
-            connection.close()
-        except:
-            print("yanlış kullanici adi girdiniz. tekrar deneyiniz")
-            return
+)
+
                                         #######***************########
         
     def room_name(self):  # flask için Oda kodu oluşturuyoruz
@@ -83,14 +66,17 @@ class server_erkek_page:
 
         print(room_code)
         #sio.on("liste", self.hoparlor_liste_al) #hoparlör listesi için dinle
+        self.receive_text()
 
         sio.on("data2", self.get_sound) #gelen sesleri dinle
         
+        self.start_communication()
+        self.yazi_gonder_t()
 
         @sio.on("connect")
         def on_connect():
             print("Bağlandı.")
-           
+
             sio.emit("baglan", {"name": name, "room": room_code})
 
         @sio.event
@@ -99,12 +85,12 @@ class server_erkek_page:
         
         self.create_room(name, room_code)
 
-    def create_room(self, name, room_code):
+    def create_room(self, name, room_code): #Kullanıcının Oda kurmasını sağlar
         print("oda oluşturuldu")
-        sio.connect(
-            "http://192.168.1.45:5000"
-        )  # Flask uygulamanızın adresine göre güncelleyin.
+
+        sio.connect("http://YOUR_IP_ADRESS:5000")  # IP adresinize göre güncelleyin.
         sio.emit("create_room", {"name": name, "room": room_code})
+
 
 
     def send_audio_e(self):
@@ -113,33 +99,26 @@ class server_erkek_page:
         stream = p.open(
             format=pyaudio.paInt16,
             channels=self.CHANNELS,
-            rate=44100,
+            rate=self.RATE,
             input=True,
             frames_per_buffer=self.CHUNK,
         )
 
         try:
-            while True:
+            while not self.Event.is_set():
                 while keyboard.is_pressed("m"):
-                    data = stream.read(self.CHUNK, exception_on_overflow=False)
+                    data = stream.read(self.CHUNK)
                     audio_data = np.frombuffer(data, dtype=np.int16)
 
-                    converted_data = (
-                        signal.resample(
-                            audio_data, int(len(audio_data) * self.PITCH_SHIFT_FACTOR)
-                        )
-                        * 1.4
-                    )
-                    converted_data = converted_data.astype(np.int16)
-                    converted_data_bytes = converted_data.tobytes()
+
                     audio_data = audio_data.tobytes()
 
                     try:
                         sio.emit("audio_data", {"audio_data": audio_data})
-
+                        audio_data = None
                     except Exception as e:
                         print("hata",e)
-                    audio_data = None
+
         except Exception as e:
             print("hata", e)
         finally:
@@ -157,30 +136,37 @@ class server_erkek_page:
 
     def get_sound(self, data):
         try:
-            if self.stream is None:
-                p = pyaudio.PyAudio()
-                self.stream = p.open(
-                    format=self.FORMAT,
-                    channels=self.CHANNELS,
-                    rate=self.RATE,
-                    output=True,
-                    frames_per_buffer=1024,
-                )
-                
-            if data:
+            if  data:
                 audio_data = data.get("audio_data2", b"")
-
-                #if self.is_running_recv:
                 self.stream.write(audio_data)
-
-            else:
-                print("data yok")
-
+            elif not data:
+                print("Data yok")
+            
         except Exception as e:
             print("Ses alma hatası:", str(e))
-            if self.stream is not None:
-                        self.stream.close()
-                        self.stream.stop_stream()
+            
+    def set_output_stream(self):
+       """
+       Cihazın hoparlörünü ayarlar
+       """
+        if self.stream is None:
+            
+            p = pyaudio.PyAudio()
+            try:
+                print("yapılıo")
+                self.stream = p.open(
+                    output=True,
+                    format=pyaudio.paInt16,
+                    channels=self.CHANNELS,
+                    rate=self.RATE,
+                    frames_per_buffer=self.CHUNK,
+                )
+               
+            except OSError as e:
+                print("Hoparlör bağlantısı yapılamadı:", e)
+                self.stream = None
+        else:
+            print("dolu")
 
 
     def yazi_gonder(self):
@@ -189,14 +175,11 @@ class server_erkek_page:
         name = "Doktor"
         while True:
             try:
-                #message = self.server_erkek.metin_yeri.toPlainText()
+               
 
-                message = input("Göndereceğiniz Metin girin")
-                """secili_efekt = (
-                    self.server_erkek.efek_combobox.currentIndex()
-                )  # comboboxda ki efekti al
-                efekt = int(secili_efekt)"""
-                efekt = input("metni okunacak efekti seçin:  0: erkek, 1:kadın, 2:çocuk, 3:yaşlı kadın(babanne), 4:yaşlı adam(dede)")
+                message = input("Göndereceğiniz Metin girin: ")
+
+                efekt = input("metni okunacak efekti seçin:  0: erkek, 1:kadın, 2:çocuk, 3:yaşlı kadın(babanne), 4:yaşlı adam(dede): ")
 
                 # Anahtar oluştur
                 key = self.generate_key()  # text için key oluştur
@@ -204,9 +187,7 @@ class server_erkek_page:
                 encrypted_message = self.encrypt_message(message, key)  # Mesajı şifrele
 
                 # flaskta ki message olayına şifreli mesajı- room-efekt ve keyi sözcük içinde emitle
-                sio.emit(
-                    "message",
-                    {
+                sio.emit("message_doktor",{
                         "data": encrypted_message.decode(),
                         "room": room,
                         "name": name,
@@ -217,15 +198,39 @@ class server_erkek_page:
             except KeyboardInterrupt:
                 pass
 
-        #sio.wait()
+            #sio.wait()
 
-            # sio.disconnect()
+            #sio.disconnect()
 
             #################******######################
 
     def yazi_gonder_t(self):
         t1 = threading.Thread(target=self.yazi_gonder)
         t1.start()
+
+    def receive_text(self):
+        print("mesaj alımı başladı")
+        @sio.on("message_student")  # flask projesindeki message olayına 'on' ile bağlanıyoruz. bu şekilde mesaj gönderildiğinde handle_message aktif olacak
+        def handle_message(message):
+
+            if "message" in message:
+                text = message.get("message", "")  # Şifreli mesaj içeriğini al
+                
+                key = message.get("key", "")  # Anahtarı al
+                
+                if text == "has entered the room":
+                    pass
+                else:
+                    # Mesajı çöz
+
+                    key = base64.urlsafe_b64decode(key.decode("utf-8"))  # Anahtarı çöz
+                    decrypted_message = self.decrypt_message(text, key)
+                    print("\nMesaj: ", decrypted_message)
+
+            else:
+                print(message)
+                pass
+
 
     def generate_key(self):
         return Fernet.generate_key()  # key oluştur
@@ -236,23 +241,14 @@ class server_erkek_page:
             message.encode()
         )  # şifrelenmiş mesajı oluştur ve return et
         return encrypted_message
-    
-    def hoparlor_liste_al(self, Liste):
-        # öğrenci tarafından gelen hoparlor listesini al ve arayüzdeki listeye aktar
-        hoparlor_liste = Liste["list"]
-        print("liste geldi")
-        print(hoparlor_liste)
-    
-    def ogr_hoparlor_sec(self):
-        # Seç butonu ile ögrenci hoparlörünü seç ve seçilen indexi istemciye yolla
-        #selected = self.server_erkek.ogrenci_hoparlor_liste.selectedIndexes()
-        selected = input("Karşı taraftan gelen hoparlör listesinden bir hoparlör seçiniz.")
-        selected_row = selected[0].row()  # İndexin ilk elemanını al
-        print(selected_row)
-        #sio.emit("output_device_index", {"index": selected_row}) # index sözcüğü ile gönder
-        sio.emit("output_device_index", {"index": selected})
+    def decrypt_message(self, encrypted_message, key):  # gelen şifreli metni ve keyi alıyoruz.
+        cipher_suite = Fernet(base64.urlsafe_b64encode(key).decode("utf-8"))
+        decrypted_message = cipher_suite.decrypt(
+            encrypted_message
+        ).decode()  # şifreleri çözüp normal asıl metnimize ulaşıyoruz
+        return decrypted_message
+
         
     
 if __name__ == "__main__":
     chat_app = server_erkek_page()
-    #chat_app.yazi_gonder_t()
