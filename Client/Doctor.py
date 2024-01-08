@@ -2,8 +2,8 @@
 #Rise Together
 #Emirhan Said ERDEM
 
-# İlk Olarak İP adresinizi create_room fonksiyonunda gerekli yere yazın
-# Kodu başlatın, İlk mesajı gönderdikten sonra biraz bekleyin. (2-3 saniye)
+# İlk Olarak İP adresinizi enter_room fonksiyonunda gerekli yere yazın
+# Kodu başlatın İlk mesajı gönderdikten sonra biraz bekleyin. (2-3 saniye)
 # Ses göndermek için Oda kurulduktan sonra 'm' tuşuna basın
 
 
@@ -12,16 +12,11 @@
 import pyaudio
 import numpy as np
 import threading
-import speech_recognition as sr
 import random
 import socketio
-import mysql.connector
 from string import ascii_uppercase
-from scipy import signal
-import os
 from cryptography.fernet import Fernet
 import keyboard
-import time
 import base64
 
 sio = socketio.Client()
@@ -38,12 +33,21 @@ class server_erkek_page:
         self.stream = None
         self.output_stream = None
 
+        self.efekt = None
         self.room_code = ""
         self.Event = threading.Event()
         self.set_output_stream()
         ######***************########
+        print("Lütfen Göndereceğiniz metnin hangi efektle Okunacağını seçiniz.\n")
+        
         self.enter_room()
-)
+        
+        #self.create_connection()                                
+       
+        
+        #self.start_communication() #ses göndermeyi başlat
+        #time.sleep(3)
+        #self.yazi_gonder_t()
 
                                         #######***************########
         
@@ -66,29 +70,28 @@ class server_erkek_page:
 
         print(room_code)
         #sio.on("liste", self.hoparlor_liste_al) #hoparlör listesi için dinle
-        self.receive_text()
-
+        #self.receive_text()
+        self.create_room(name, room_code)
+        sio.on("message_student",self.receive_text)
         sio.on("data2", self.get_sound) #gelen sesleri dinle
-        
-        self.start_communication()
+
         self.yazi_gonder_t()
+        self.start_communication()
 
         @sio.on("connect")
         def on_connect():
-            print("Bağlandı.")
-
             sio.emit("baglan", {"name": name, "room": room_code})
 
         @sio.event
         def disconnect():
             print("Bağlantı kesildi.")
         
-        self.create_room(name, room_code)
+        
 
     def create_room(self, name, room_code): #Kullanıcının Oda kurmasını sağlar
         print("oda oluşturuldu")
 
-        sio.connect("http://YOUR_IP_ADRESS:5000")  # IP adresinize göre güncelleyin.
+        sio.connect("http://10.10.223.156:5000")  # IP adresinize göre güncelleyin.
         sio.emit("create_room", {"name": name, "room": room_code})
 
 
@@ -144,16 +147,13 @@ class server_erkek_page:
             
         except Exception as e:
             print("Ses alma hatası:", str(e))
-            
     def set_output_stream(self):
-       """
-       Cihazın hoparlörünü ayarlar
-       """
+       
         if self.stream is None:
             
             p = pyaudio.PyAudio()
             try:
-                print("yapılıo")
+                
                 self.stream = p.open(
                     output=True,
                     format=pyaudio.paInt16,
@@ -171,16 +171,14 @@ class server_erkek_page:
 
     def yazi_gonder(self):
         room = self.room_code
-
+        efekt = input("0: Erkek - 1: Kadın- 2: Çocuk - 3:Babanne - 4: Dede\n")
         name = "Doktor"
         while True:
             try:
-               
-
-                message = input("Göndereceğiniz Metin girin: ")
-
-                efekt = input("metni okunacak efekti seçin:  0: erkek, 1:kadın, 2:çocuk, 3:yaşlı kadın(babanne), 4:yaşlı adam(dede): ")
-
+                #message = self.server_erkek.metin_yeri.toPlainText()
+                
+                message = input("\nGöndereceğiniz Metin girin: ")
+                
                 # Anahtar oluştur
                 key = self.generate_key()  # text için key oluştur
 
@@ -205,19 +203,17 @@ class server_erkek_page:
             #################******######################
 
     def yazi_gonder_t(self):
+        
+        
         t1 = threading.Thread(target=self.yazi_gonder)
         t1.start()
 
-    def receive_text(self):
-        print("mesaj alımı başladı")
-        @sio.on("message_student")  # flask projesindeki message olayına 'on' ile bağlanıyoruz. bu şekilde mesaj gönderildiğinde handle_message aktif olacak
-        def handle_message(message):
-
-            if "message" in message:
+    def receive_text(self,message):
+       
+        if "message" in message:
                 text = message.get("message", "")  # Şifreli mesaj içeriğini al
-                
                 key = message.get("key", "")  # Anahtarı al
-                
+                user = message.get("name","")
                 if text == "has entered the room":
                     pass
                 else:
@@ -225,9 +221,9 @@ class server_erkek_page:
 
                     key = base64.urlsafe_b64decode(key.decode("utf-8"))  # Anahtarı çöz
                     decrypted_message = self.decrypt_message(text, key)
-                    print("\nMesaj: ", decrypted_message)
+                    print("\n",user,":", decrypted_message)
 
-            else:
+        else:
                 print(message)
                 pass
 
@@ -252,3 +248,4 @@ class server_erkek_page:
     
 if __name__ == "__main__":
     chat_app = server_erkek_page()
+    #chat_app.yazi_gonder_t()
