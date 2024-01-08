@@ -1,6 +1,3 @@
-#Doktor tarafından gelen mesajların sesli okunması için yapılmış koddur.
-#Emirhan Said ERDEM
-
 import threading
 from responsive_voice import ResponsiveVoice
 
@@ -12,7 +9,8 @@ def read_woman(metin):
                 engine.say(metin, gender=ResponsiveVoice.FEMALE, rate=0.47, pitch=0.5, vol=1)
  
         except:
-                return
+                read_woman(metin)
+
 def read_text__woman_thread(metin):
        
         threading.Thread(target=read_woman, args=(metin,)).start()
@@ -28,8 +26,9 @@ def read_man(metin):
                 engine = ResponsiveVoice()
                 engine = ResponsiveVoice(lang=ResponsiveVoice.TURKISH)
                 engine.say(metin, gender=ResponsiveVoice.MALE, rate=0.47, pitch=0.36, vol=1)
+                print(metin)
         except:
-                return
+                read_man(metin)
 
 def read_old_man(metin):
         try:
@@ -37,7 +36,7 @@ def read_old_man(metin):
                 engine = ResponsiveVoice(lang=ResponsiveVoice.TURKISH)
                 engine.say(metin, gender=ResponsiveVoice.MALE, rate=0.33, pitch=0.25, vol=1)
         except:
-                return       
+                read_old_man(metin)
 
 def read__old_man_t(metin):
 
@@ -51,7 +50,8 @@ def read_old_woman(metin):
                 
                 engine.say(metin, gender=ResponsiveVoice.FEMALE, rate=0.36, pitch=0.28, vol=1)
         except:
-                return
+                read_old_woman(metin)
+
        
 
 def read__old_woman_t(metin):
@@ -65,10 +65,9 @@ def read_children(metin):
                 engine = ResponsiveVoice(lang=ResponsiveVoice.TURKISH)
                 engine.say(metin, gender=ResponsiveVoice.FEMALE, rate=0.45, pitch=0.75, vol=0.5)
         except:
-                return
+                read_children(metin)
         
 def read_children_thread(metin):
 
         threading.Thread(target=read_children, args=(metin,)).start()
-
 
