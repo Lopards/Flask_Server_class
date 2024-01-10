@@ -40,6 +40,7 @@ class istemci_page:
         
 
         self.enter_room()
+        #self.start_communication()
 
     def enter_room(self,):  # flask ile kurulan odaya giriş yapılıyor. Ses ve metin alışverişi başlatılıyor
         try:
@@ -49,14 +50,14 @@ class istemci_page:
 
             self.receive_text()
             self.yazi_gonder_t()
-            # self.start_communication()
+            self.start_communication()
             sio.on("data1", self.get_sound)
 
             @sio.event
             def connect():  # flaska adımız ve oda bilgisi gönderiliyor.
                 sio.emit("baglan", {"name": name, "room": room})
 
-            sio.connect("http://YOUR_IP_ADRESS:5000", auth={"name": name, "room": room})
+            sio.connect("http://192.168.1.33:5000", auth={"name": name, "room": room})
             # sio.wait()
         except:
             print("Yanlış oda Kodu girmiş olabilirsiniz Lütfen tekrar yazınız.")
@@ -68,7 +69,7 @@ class istemci_page:
                 text = message.get("message", "")  # Şifreli mesaj içeriğini al
                 efekt = message.get("efekt", "")  # Efekti al
                 key = message.get("key", "")  # Anahtarı al
-
+                user = message.get("name","")
                 if text == "has entered the room":
                     pass
                 else:
@@ -77,7 +78,7 @@ class istemci_page:
                     key = base64.urlsafe_b64decode(key.decode("utf-8"))  # Anahtarı çöz
                     decrypted_message = self.decrypt_message(text, key)
 
-                    print(decrypted_message)
+                    print("\n",user,":", decrypted_message)
 
                     if efekt == 0:
                         read_man(decrypted_message)
@@ -130,7 +131,7 @@ class istemci_page:
         )
 
         try:
-            while True:
+            while not self.Event.is_set():
                 data = stream.read(self.CHUNK)
                 audio_data = np.frombuffer(data, dtype=np.int16)
 
