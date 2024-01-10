@@ -70,7 +70,7 @@ class server_erkek_page:
 
         print(room_code)
         #sio.on("liste", self.hoparlor_liste_al) #hoparlör listesi için dinle
-        #self.receive_text()
+        
         self.create_room(name, room_code)
         sio.on("message_student",self.receive_text)
         sio.on("data2", self.get_sound) #gelen sesleri dinle
@@ -91,7 +91,7 @@ class server_erkek_page:
     def create_room(self, name, room_code): #Kullanıcının Oda kurmasını sağlar
         print("oda oluşturuldu")
 
-        sio.connect("http://10.10.223.156:5000")  # IP adresinize göre güncelleyin.
+        sio.connect("http://192.168.1.33:5000")  # IP adresinize göre güncelleyin.
         sio.emit("create_room", {"name": name, "room": room_code})
 
 
@@ -109,7 +109,7 @@ class server_erkek_page:
 
         try:
             while not self.Event.is_set():
-                while keyboard.is_pressed("m"):
+                #while keyboard.is_pressed("m"):
                     data = stream.read(self.CHUNK)
                     audio_data = np.frombuffer(data, dtype=np.int16)
 
